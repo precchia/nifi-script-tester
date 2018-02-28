@@ -20,6 +20,7 @@ plugins {
     id 'maven'
     id 'maven-publish'
     id 'signing'
+    id 'eclipse'
     id 'com.github.johnrengelman.shadow' version '2.0.0'
 }
 
@@ -35,6 +36,11 @@ repositories {
     jcenter()
 }
 
+eclipse {
+    classpath {
+        downloadJavadoc = true
+    }
+}
 
 dependencies {
     compile "org.apache.nifi:nifi-api:${project.ext.NIFI_VERSION}"
