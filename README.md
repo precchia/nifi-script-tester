@@ -23,6 +23,10 @@ java -cp nifi-script-tester-<version>-all.jar [options] script_file
     
     -input=<directory>  Send each file in the specified directory as a flow file to the script
     
+    -outputSuccess=<directory>  Store flowfiles sent to relationship success within this directory
+
+    -outputFailure=<directory>  Store flowfiles sent to relationship failure within this directory
+
     -modules=<paths>    Comma-separated list of paths (files or directories) containing script modules/JARs
     
     

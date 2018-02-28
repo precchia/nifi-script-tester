@@ -26,6 +26,7 @@ import org.apache.nifi.util.TestRunners;
 import nifi.script.ExecuteScript;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.FileVisitResult;
@@ -55,6 +56,9 @@ public class ScriptRunner {
     private static boolean outputSuccess = true;
     private static boolean outputFailure = false;
     private static String inputFileDir = "";
+    private static String successOutputDir = null;
+    private static String failureOutputDir = null;
+    private static String attributesOutputDir = null;
     private static String scriptPath = "";
     private static String modulePaths = "";
     private static String attrFile = "";
@@ -75,6 +79,10 @@ public class ScriptRunner {
             System.err.println("   -all-rels           Output information about flow files that were transferred to any relationship. Defaults to false");
             System.err.println("   -all                Output content, attributes, etc. about flow files that were transferred to any relationship. Defaults to false");
             System.err.println("   -input=<directory>  Send each file in the specified directory as a flow file to the script");
+            System.err.println("   -outputSuccess=<directory> Store flowfiles sent to relationship success within this directory");
+            System.err.println("   -outputFailure=<directory> Store flowfiles sent to relationship failure within this directory");
+            // Not yet implemented
+            //System.err.println("   -outputAttributes=<directory> Store result for each flow file within this directory");
             System.err.println("   -modules=<paths>    Comma-separated list of paths (files or directories) containing script modules/JARs");
             System.err.println("   -attrfile=<paths>   Path to a properties file specifying attributes to add to incoming flow files.");
             System.exit(1);
@@ -111,6 +119,12 @@ public class ScriptRunner {
                 outputAttributes = true;
             } else if (arg.startsWith("-input=")) {
                 inputFileDir = arg.substring("-input=".length());
+            } else if (arg.startsWith("-outputSuccess=")) {
+                successOutputDir = arg.substring("-outputSuccess=".length());
+            } else if (arg.startsWith("-outputFailure=")) {
+                failureOutputDir = arg.substring("-outputFailure=".length());
+            } else if (arg.startsWith("-outputAttributes=")) {
+                attributesOutputDir = arg.substring("-outputAttributes=".length());
             } else if (arg.startsWith("-modules=")) {
                 modulePaths = arg.substring("-modules=".length());
             } else if (arg.startsWith("-attrfile=")) {
@@ -192,6 +206,43 @@ public class ScriptRunner {
                     System.err.println("Input file location is not a directory: " + inputFileDir);
                     System.exit(4);
                 }
+                if (successOutputDir != null) {
+                    // Write success flow files in this folder
+                    Path successOutputFiles = Paths.get(successOutputDir);
+                    if (!Files.exists(successOutputFiles)) {
+                        System.err.println("Success output directory does not exist: " + successOutputDir);
+                        System.exit(3);
+                    }
+                    if (!Files.isDirectory(successOutputFiles)) {
+                        System.err.println("Success output location is not a directory: " + successOutputDir);
+                        System.exit(4);
+                    }
+
+                }
+                if (failureOutputDir != null) {
+                    // Write failure flow files in this folder
+                    Path failureOutputFiles = Paths.get(failureOutputDir);
+                    if (!Files.exists(failureOutputFiles)) {
+                        System.err.println("Failure output directory does not exist: " + failureOutputDir);
+                        System.exit(3);
+                    }
+                    if (!Files.isDirectory(failureOutputFiles)) {
+                        System.err.println("Failure output location is not a directory: " + failureOutputDir);
+                        System.exit(4);
+                    }
+                }
+                if (attributesOutputDir != null) {
+                    // Write flow files attributes in this folder
+	                Path attributesOutputFiles = Paths.get(attributesOutputDir);
+	                if (!Files.exists(attributesOutputFiles)) {
+	                    System.err.println("Attributes output directory does not exist: " + attributesOutputDir);
+	                    System.exit(3);
+	                }
+	                if (!Files.isDirectory(attributesOutputFiles)) {
+	                    System.err.println("Attributes output location is not a directory: " + attributesOutputDir);
+	                    System.exit(4);
+	                }
+                }
                 Files.walkFileTree(inputFiles, new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
@@ -216,9 +267,15 @@ public class ScriptRunner {
         if (outputSuccess) {
             outputFlowFilesForRelationship(ExecuteScript.REL_SUCCESS);
         }
+        if (successOutputDir != null) {
+            writeFlowFilesForRelationship(ExecuteScript.REL_SUCCESS, successOutputDir);
+        }
 
         if (outputFailure) {
             outputFlowFilesForRelationship(ExecuteScript.REL_FAILURE);
+        }
+        if (failureOutputDir != null) {
+            writeFlowFilesForRelationship(ExecuteScript.REL_FAILURE, failureOutputDir);
         }
     }
 
@@ -250,6 +307,21 @@ public class ScriptRunner {
                 System.out.println("");
             }
             System.out.println("Flow Files transferred to " + relationship.getName() + ": " + files.size() + "\n");
+        }
+    }
+    private static void writeFlowFilesForRelationship(Relationship relationship, String dir) {
+        List<MockFlowFile> files = runner.getFlowFilesForRelationship(relationship);
+        if (files != null) {
+            for (MockFlowFile flowFile : files) {
+                String filename = flowFile.getAttribute("filename");
+                Path file = Paths.get(dir,filename);
+                System.err.println("writing relationship " + relationship + " of: " + flowFile + " into " + file);
+                try {
+                    Files.write(file, flowFile.toByteArray());
+				} catch (IOException e) {
+                    System.err.println("Error writing to " + file + ": " + e);
+				}
+            }
         }
     }
 }
